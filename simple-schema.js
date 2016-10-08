@@ -418,6 +418,41 @@ function getAutoValues(mDoc, isModifier, extendedAutoValueContext) {
   });
 }
 
+
+/**
+ * @method getKeyPlaceholder
+ * @private
+ * @param {Object} schemaForKey - Object that will be added to the context when calling each autoValue function
+ * @returns {Boolean|String|undefined}
+ *
+ * Updates doc with automatic values from autoValue functions or default
+ * values from defaultValue. Modifies the referenced object in place.
+ */
+function getKeyPlaceholder(schemaForKey) {
+  var result;
+  if (schemaForKey.autoform) {
+    if (typeof schemaForKey.autoform.placeholder != 'undefined') {
+      result = schemaForKey.autoform.placeholder;
+      
+      // delete autoform.placeholder;
+      schemaForKey.autoform = _.omit(schemaForKey.autoform, 'placeholder');
+
+      return result;
+    }
+    
+    for (var key in schemaForKey.autoform) {
+      if (typeof schemaForKey.autoform[key].placeholder!= 'undefined') {
+        result = schemaForKey.autoform[key].placeholder;
+        
+        // delete autoform[key].placeholder;
+        schemaForKey.autoform[key] = _.omit(schemaForKey.autoform[key], 'placeholder');
+  
+        return result;
+      }
+    }
+  }
+}
+
 //exported
 SimpleSchema = function(schemas, options) {
   var self = this;
@@ -432,6 +467,31 @@ SimpleSchema = function(schemas, options) {
 
   // adjust and store a copy of the schema definitions
   self._schema = mergeSchemas(schemas);
+  
+  // insert placeholder into the schema if addPlaceholder mode is on
+  if (SimpleSchema.addPlaceholder) {
+    var placeholder = null;
+    var keyPlaceholder = null;
+    var keyLabel = null;
+    
+    for (var key in self._schema) {
+      placeholder = getKeyPlaceholder(self._schema[key]);
+      
+      if (typeof placeholder == 'undefined') {
+        //there is no placeholder set one using the format
+        keyLabel = self._schema[key].label || inflectedLabel(key);
+        keyPlaceholder = SimpleSchema.placeholderFormat.replace("[schemaLabel]", keyLabel);
+        
+        self._schema[key].autoform = self._schema[key].autoform || {};
+        self._schema[key].autoform.placeholder = keyPlaceholder;
+        
+      } else if (typeof placeholder == 'string') {
+        self._schema[key].autoform.placeholder = placeholder;
+      }
+      
+      
+    }
+  }
 
   // store the list of defined keys for speedier checking
   self._schemaKeys = [];
